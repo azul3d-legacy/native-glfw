@@ -8,4 +8,3 @@ This repository effectively mirrors [go-gl](http://github.com/go-gl/glfw3) but i
 Azul3D uses this import path to ensure old code still builds.
 
 `import "azul3d.org/native/glfw.v3.1"`
-
