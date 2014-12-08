@@ -48,6 +48,9 @@
 // The Xkb extension provides improved keyboard support
 #include <X11/XKBlib.h>
 
+// The Xinerama extension provides legacy monitor indices
+#include <X11/extensions/Xinerama.h>
+
 #include "posix_tls.h"
 
 #if defined(_GLFW_GLX)
@@ -72,22 +75,15 @@
 #define _GLFW_PLATFORM_CURSOR_STATE         _GLFWcursorX11  x11
 
 
-//========================================================================
-// GLFW platform specific types
-//========================================================================
-
-
-//------------------------------------------------------------------------
-// Platform-specific window structure
-//------------------------------------------------------------------------
+// X11-specific per-window data
+//
 typedef struct _GLFWwindowX11
 {
-    // Platform specific window resources
-    Colormap        colormap;          // Window colormap
-    Window          handle;            // Window handle
+    Colormap        colormap;
+    Window          handle;
+    XIC             ic;
 
-    // Various platform specific internal variables
-    GLboolean       overrideRedirect; // True if window is OverrideRedirect
+    GLboolean       overrideRedirect;
 
     // Cached position and size used to filter out duplicate events
     int             width, height;
@@ -101,9 +97,8 @@ typedef struct _GLFWwindowX11
 } _GLFWwindowX11;
 
 
-//------------------------------------------------------------------------
-// Platform-specific library global data for X11
-//------------------------------------------------------------------------
+// X11-specific global data
+//
 typedef struct _GLFWlibraryX11
 {
     Display*        display;
@@ -112,9 +107,19 @@ typedef struct _GLFWlibraryX11
 
     // Invisible cursor for hidden cursor mode
     Cursor          cursor;
+    // Context for mapping window XIDs to _GLFWwindow pointers
     XContext        context;
+    // XIM input method
+    XIM             im;
+    // True if window manager supports EWMH
+    GLboolean       hasEWMH;
+    // Most recent error code received by X error handler
+    int             errorCode;
 
     char*           clipboardString;
+
+    // LUT for mapping X11 key codes to GLFW key codes
+    int             keyCodeLUT[256];
 
     // Window manager atoms
     Atom            WM_PROTOCOLS;
@@ -128,6 +133,7 @@ typedef struct _GLFWlibraryX11
     Atom            NET_WM_STATE_ABOVE;
     Atom            NET_WM_STATE_FULLSCREEN;
     Atom            NET_WM_BYPASS_COMPOSITOR;
+    Atom            NET_WM_FULLSCREEN_MONITORS;
     Atom            NET_ACTIVE_WINDOW;
     Atom            NET_FRAME_EXTENTS;
     Atom            NET_REQUEST_FRAME_EXTENTS;
@@ -155,12 +161,6 @@ typedef struct _GLFWlibraryX11
     Atom            COMPOUND_STRING;
     Atom            ATOM_PAIR;
     Atom            GLFW_SELECTION;
-
-    // True if window manager supports EWMH
-    GLboolean       hasEWMH;
-
-    // Error code received by the X error handler
-    int             errorCode;
 
     struct {
         GLboolean   available;
@@ -197,9 +197,6 @@ typedef struct _GLFWlibraryX11
         int         versionMinor;
     } xi;
 
-    // LUT for mapping X11 key codes to GLFW key codes
-    int             keyCodeLUT[256];
-
     struct {
         int         count;
         int         timeout;
@@ -212,56 +209,49 @@ typedef struct _GLFWlibraryX11
         Window      source;
     } xdnd;
 
+    struct {
+        GLboolean   available;
+        int         versionMajor;
+        int         versionMinor;
+    } xinerama;
+
 } _GLFWlibraryX11;
 
 
-//------------------------------------------------------------------------
-// Platform-specific monitor structure
-//------------------------------------------------------------------------
+// X11-specific per-monitor data
+//
 typedef struct _GLFWmonitorX11
 {
     RROutput        output;
     RRCrtc          crtc;
     RRMode          oldMode;
 
+    // Index of corresponding Xinerama screen,
+    // for EWMH full screen window placement
+    int             index;
+
 } _GLFWmonitorX11;
 
 
-//------------------------------------------------------------------------
-// Platform-specific cursor structure
-//------------------------------------------------------------------------
+// X11-specific per-cursor data
+//
 typedef struct _GLFWcursorX11
 {
     Cursor handle;
+
 } _GLFWcursorX11;
 
 
-//========================================================================
-// Prototypes for platform specific internal functions
-//========================================================================
-
-// Gamma
-void _glfwInitGammaRamp(void);
-
-// Fullscreen support
 GLboolean _glfwSetVideoMode(_GLFWmonitor* monitor, const GLFWvidmode* desired);
 void _glfwRestoreVideoMode(_GLFWmonitor* monitor);
 
-// Clipboard handling
-void _glfwHandleSelectionClear(XEvent* event);
-void _glfwHandleSelectionRequest(XEvent* event);
-void _glfwPushSelectionToManager(_GLFWwindow* window);
-
 Cursor _glfwCreateCursor(const GLFWimage* image, int xhot, int yhot);
 
-// Window support
-_GLFWwindow* _glfwFindWindowByHandle(Window handle);
 unsigned long _glfwGetWindowProperty(Window window,
                                      Atom property,
                                      Atom type,
                                      unsigned char** value);
 
-// X11 error handler
 void _glfwGrabXErrorHandler(void);
 void _glfwReleaseXErrorHandler(void);
 void _glfwInputXError(int error, const char* message);

@@ -26,6 +26,8 @@
 
 #include "internal.h"
 
+#include <string.h>
+
 // Needed for _NSGetProgname
 #include <crt_externs.h>
 
@@ -1153,6 +1155,12 @@ void _glfwPlatformShowWindow(_GLFWwindow* window)
     _glfwInputWindowVisibility(window, GL_TRUE);
 }
 
+void _glfwPlatformUnhideWindow(_GLFWwindow* window)
+{
+    [window->ns.object orderFront:nil];
+    _glfwInputWindowVisibility(window, GL_TRUE);
+}
+
 void _glfwPlatformHideWindow(_GLFWwindow* window)
 {
     [window->ns.object orderOut:nil];
@@ -1193,6 +1201,7 @@ void _glfwPlatformWaitEvents(void)
 
 void _glfwPlatformPostEmptyEvent(void)
 {
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
     NSEvent* event = [NSEvent otherEventWithType:NSApplicationDefined
                                         location:NSMakePoint(0, 0)
                                    modifierFlags:0
@@ -1203,6 +1212,7 @@ void _glfwPlatformPostEmptyEvent(void)
                                            data1:0
                                            data2:0];
     [NSApp postEvent:event atStart:YES];
+    [pool drain];
 }
 
 void _glfwPlatformSetCursorPos(_GLFWwindow* window, double x, double y)
@@ -1293,6 +1303,40 @@ void _glfwPlatformSetCursor(_GLFWwindow* window, _GLFWcursor* cursor)
         else
             [[NSCursor arrowCursor] set];
     }
+}
+
+void _glfwPlatformSetClipboardString(_GLFWwindow* window, const char* string)
+{
+    NSArray* types = [NSArray arrayWithObjects:NSStringPboardType, nil];
+
+    NSPasteboard* pasteboard = [NSPasteboard generalPasteboard];
+    [pasteboard declareTypes:types owner:nil];
+    [pasteboard setString:[NSString stringWithUTF8String:string]
+                  forType:NSStringPboardType];
+}
+
+const char* _glfwPlatformGetClipboardString(_GLFWwindow* window)
+{
+    NSPasteboard* pasteboard = [NSPasteboard generalPasteboard];
+
+    if (![[pasteboard types] containsObject:NSStringPboardType])
+    {
+        _glfwInputError(GLFW_FORMAT_UNAVAILABLE, NULL);
+        return NULL;
+    }
+
+    NSString* object = [pasteboard stringForType:NSStringPboardType];
+    if (!object)
+    {
+        _glfwInputError(GLFW_PLATFORM_ERROR,
+                        "Cocoa: Failed to retrieve object from pasteboard");
+        return NULL;
+    }
+
+    free(_glfw.ns.clipboardString);
+    _glfw.ns.clipboardString = strdup([object UTF8String]);
+
+    return _glfw.ns.clipboardString;
 }
 
 
