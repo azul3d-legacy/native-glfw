@@ -1,4 +1,4 @@
-package glfw3
+package glfw
 
 /*
 // Choose OpenGL client on 386 and amd64.
