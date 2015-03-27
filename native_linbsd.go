@@ -1,4 +1,4 @@
-//+build linux freebsd
+// +build linux freebsd
 
 package glfw
 
@@ -8,14 +8,20 @@ package glfw
 //#include "glfw/include/GLFW/glfw3native.h"
 import "C"
 
-func (w *Window) GetX11Window() (C.Window, error) {
-	return C.glfwGetX11Window(w.data), fetchError()
+func (w *Window) GetX11Window() C.Window {
+	ret := C.glfwGetX11Window(w.data)
+	panicError()
+	return ret
 }
 
-func (w *Window) GetGLXContext() (C.GLXContext, error) {
-	return C.glfwGetGLXContext(w.data), fetchError()
+func (w *Window) GetGLXContext() C.GLXContext {
+	ret := C.glfwGetGLXContext(w.data)
+	panicError()
+	return ret
 }
 
-func GetX11Display() (*C.Display, error) {
-	return C.glfwGetX11Display(), fetchError()
+func GetX11Display() *C.Display {
+	ret := C.glfwGetX11Display()
+	panicError()
+	return ret
 }

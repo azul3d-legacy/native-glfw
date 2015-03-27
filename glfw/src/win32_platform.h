@@ -158,10 +158,11 @@ typedef struct _GLFWwindowWin32
     DWORD               dwStyle;
     DWORD               dwExStyle;
 
-    GLboolean           cursorCentered;
     GLboolean           cursorInside;
-    GLboolean           cursorHidden;
-    int                 oldCursorX, oldCursorY;
+    GLboolean           iconified;
+
+    // The last received cursor position, regardless of source
+    int                 cursorPosX, cursorPosY;
 
 } _GLFWwindowWin32;
 
@@ -172,6 +173,7 @@ typedef struct _GLFWlibraryWin32
 {
     DWORD               foregroundLockTimeout;
     char*               clipboardString;
+    short int           publicKeys[512];
 
     // winmm.dll
     struct {
@@ -205,7 +207,8 @@ typedef struct _GLFWmonitorWin32
     // This size matches the static size of DISPLAY_DEVICE.DeviceName
     WCHAR               adapterName[32];
     WCHAR               displayName[32];
-    char                nativeName[64];
+    char                publicAdapterName[64];
+    char                publicDisplayName[64];
     GLboolean           modeChanged;
 
 } _GLFWmonitorWin32;

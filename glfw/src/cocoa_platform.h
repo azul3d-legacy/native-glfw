@@ -62,7 +62,11 @@ typedef struct _GLFWwindowNS
     id	            delegate;
     id              view;
     unsigned int    modifierFlags;
-    int             cursorInside;
+
+    // The total sum of the distances the cursor has been warped
+    // since the last cursor motion event was processed
+    // This is kept to counteract Cocoa doing the same internally
+    double          warpDeltaX, warpDeltaY;
 
 } _GLFWwindowNS;
 
@@ -76,6 +80,7 @@ typedef struct _GLFWlibraryNS
     id              autoreleasePool;
     id              cursor;
 
+    short int       publicKeys[256];
     char*           clipboardString;
 
 } _GLFWlibraryNS;

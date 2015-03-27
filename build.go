@@ -1,12 +1,13 @@
 package glfw
 
 /*
-// Choose OpenGL client on 386 and amd64.
-#cgo 386 CFLAGS: -D_GLFW_USE_OPENGL
-#cgo amd64 CFLAGS: -D_GLFW_USE_OPENGL
+// Standard OpenGL client is used on 386 and amd64 architectures, except when
+// explicitly asked for gles2 or wayland.
+#cgo 386,!gles2,!wayland CFLAGS: -D_GLFW_USE_OPENGL
+#cgo amd64,!gles2,!wayland CFLAGS: -D_GLFW_USE_OPENGL
 
-// Choose OpenGL ES V2 on arm.
-#cgo arm CFLAGS: -D_GLFW_USE_GLESV2
+// Choose OpenGL ES V2 on arm, or when explicitly asked for gles2/wayland.
+#cgo arm gles2 wayland CFLAGS: -D_GLFW_USE_GLESV2
 
 
 // Windows Build Tags
@@ -45,7 +46,7 @@ package glfw
 #cgo freebsd,wayland CFLAGS: -D_GLFW_WAYLAND -D_GLFW_EGL -D_GLFW_HAS_DLOPEN
 
 // Linker Options:
-#cgo freebsd,!wayland LDFLAGS: -lGL -lX11 -lXrandr -lXxf86vm -lXi -lXcursor -lm
-#cgo freebsd,wayland LDFLAGS: -lGL -lX11 -lXrandr -lXxf86vm -lXi -lXcursor -lm
+#cgo freebsd,!wayland LDFLAGS: -lGL -lX11 -lXrandr -lXxf86vm -lXi -lXcursor -lm -lXinerama
+#cgo freebsd,wayland LDFLAGS: -lGL -lX11 -lXrandr -lXxf86vm -lXi -lXcursor -lm -lXinerama
 */
 import "C"

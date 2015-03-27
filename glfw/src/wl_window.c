@@ -239,7 +239,7 @@ void _glfwPlatformGetWindowPos(_GLFWwindow* window, int* xpos, int* ypos)
     // as (0, 0)
 
     _glfwInputError(GLFW_PLATFORM_ERROR,
-                    "Wayland: Window position retreival not supported");
+                    "Wayland: Window position retrieval not supported");
 }
 
 void _glfwPlatformSetWindowPos(_GLFWwindow* window, int xpos, int ypos)
@@ -307,6 +307,24 @@ void _glfwPlatformHideWindow(_GLFWwindow* window)
     wl_surface_commit(window->wl.surface);
 }
 
+int _glfwPlatformWindowFocused(_GLFWwindow* window)
+{
+    // TODO
+    return GL_FALSE;
+}
+
+int _glfwPlatformWindowIconified(_GLFWwindow* window)
+{
+    // TODO
+    return GL_FALSE;
+}
+
+int _glfwPlatformWindowVisible(_GLFWwindow* window)
+{
+    // TODO
+    return GL_FALSE;
+}
+
 void _glfwPlatformPollEvents(void)
 {
     struct wl_display* display = _glfw.wl.display;
@@ -352,6 +370,12 @@ void _glfwPlatformWaitEvents(void)
 void _glfwPlatformPostEmptyEvent(void)
 {
     wl_display_sync(_glfw.wl.display);
+}
+
+void _glfwPlatformGetCursorPos(_GLFWwindow* window, double* xpos, double* ypos)
+{
+    // TODO
+    fprintf(stderr, "_glfwPlatformGetCursorPos not implemented yet\n");
 }
 
 void _glfwPlatformSetCursorPos(_GLFWwindow* window, double x, double y)
@@ -420,6 +444,13 @@ int _glfwPlatformCreateCursor(_GLFWcursor* cursor,
     cursor->wl.xhot = xhot;
     cursor->wl.yhot = yhot;
     return GL_TRUE;
+}
+
+int _glfwPlatformCreateStandardCursor(_GLFWcursor* cursor, int shape)
+{
+    // TODO
+    fprintf(stderr, "_glfwPlatformCreateStandardCursor not implemented yet\n");
+    return GL_FALSE;
 }
 
 void _glfwPlatformDestroyCursor(_GLFWcursor* cursor)

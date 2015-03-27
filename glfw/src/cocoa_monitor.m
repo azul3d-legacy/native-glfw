@@ -48,7 +48,7 @@ static char* getDisplayName(CGDirectDisplayID displayID)
     CFIndex size;
 
     // NOTE: This uses a deprecated function because Apple has
-    //       (as of September 2014) not provided any alternative
+    //       (as of January 2015) not provided any alternative
     info = IODisplayCreateInfoDictionary(CGDisplayIOServicePort(displayID),
                                          kIODisplayOnlyPreferredName);
     names = CFDictionaryGetValue(info, CFSTR(kDisplayProductName));
@@ -57,7 +57,8 @@ static char* getDisplayName(CGDirectDisplayID displayID)
                                                  (const void**) &value))
     {
         // This may happen if a desktop Mac is running headless
-        _glfwInputError(GLFW_PLATFORM_ERROR, "Failed to retrieve display name");
+        _glfwInputError(GLFW_PLATFORM_ERROR,
+                        "Cocoa: Failed to retrieve display name");
 
         CFRelease(info);
         return strdup("Unknown");
@@ -204,7 +205,6 @@ GLboolean _glfwSetVideoMode(_GLFWmonitor* monitor, const GLFWvidmode* desired)
             monitor->ns.previousMode = CGDisplayCopyDisplayMode(monitor->ns.displayID);
 
         CGDisplayFadeReservationToken token = beginFadeReservation();
-        CGDisplayCapture(monitor->ns.displayID);
         CGDisplaySetDisplayMode(monitor->ns.displayID, native, NULL);
         endFadeReservation(token);
     }
@@ -231,7 +231,6 @@ void _glfwRestoreVideoMode(_GLFWmonitor* monitor)
         CGDisplayFadeReservationToken token = beginFadeReservation();
         CGDisplaySetDisplayMode(monitor->ns.displayID,
                                 monitor->ns.previousMode, NULL);
-        CGDisplayRelease(monitor->ns.displayID);
         endFadeReservation(token);
 
         CGDisplayModeRelease(monitor->ns.previousMode);
@@ -264,9 +263,6 @@ _GLFWmonitor** _glfwPlatformGetMonitors(int* count)
     for (i = 0;  i < displayCount;  i++)
     {
         int j;
-
-        if (CGDisplayIsAsleep(displays[i]))
-            continue;
 
         CGDirectDisplayID screenDisplayID = CGDisplayMirrorsDisplay(displays[i]);
         if (screenDisplayID == kCGNullDirectDisplay)

@@ -61,13 +61,14 @@ const (
 
 // Context related hints.
 const (
-	ClientAPI               Hint = C.GLFW_CLIENT_API            // Specifies which client API to create the context for. Hard constraint.
-	ContextVersionMajor     Hint = C.GLFW_CONTEXT_VERSION_MAJOR // Specifies the client API version that the created context must be compatible with.
-	ContextVersionMinor     Hint = C.GLFW_CONTEXT_VERSION_MINOR // Specifies the client API version that the created context must be compatible with.
-	ContextRobustness       Hint = C.GLFW_CONTEXT_ROBUSTNESS    // Specifies the robustness strategy to be used by the context.
-	OpenGLForwardCompatible Hint = C.GLFW_OPENGL_FORWARD_COMPAT // Specifies whether the OpenGL context should be forward-compatible. Hard constraint.
-	OpenGLDebugContext      Hint = C.GLFW_OPENGL_DEBUG_CONTEXT
-	OpenGLProfile           Hint = C.GLFW_OPENGL_PROFILE // Specifies which OpenGL profile to create the context for. Hard constraint.
+	ClientAPI               Hint = C.GLFW_CLIENT_API               // Specifies which client API to create the context for. Hard constraint.
+	ContextVersionMajor     Hint = C.GLFW_CONTEXT_VERSION_MAJOR    // Specifies the client API version that the created context must be compatible with.
+	ContextVersionMinor     Hint = C.GLFW_CONTEXT_VERSION_MINOR    // Specifies the client API version that the created context must be compatible with.
+	ContextRobustness       Hint = C.GLFW_CONTEXT_ROBUSTNESS       // Specifies the robustness strategy to be used by the context.
+	ContextReleaseBehavior  Hint = C.GLFW_CONTEXT_RELEASE_BEHAVIOR // Specifies the release behavior to be used by the context.
+	OpenGLForwardCompatible Hint = C.GLFW_OPENGL_FORWARD_COMPAT    // Specifies whether the OpenGL context should be forward-compatible. Hard constraint.
+	OpenGLDebugContext      Hint = C.GLFW_OPENGL_DEBUG_CONTEXT     // Specifies whether to create a debug OpenGL context, which may have additional error and performance issue reporting functionality. If OpenGL ES is requested, this hint is ignored.
+	OpenGLProfile           Hint = C.GLFW_OPENGL_PROFILE           // Specifies which OpenGL profile to create the context for. Hard constraint.
 )
 
 // Framebuffer related hints.
@@ -87,10 +88,11 @@ const (
 	Stereo          Hint = C.GLFW_STEREO           // Specifies whether to use stereoscopic rendering. Hard constraint.
 	Samples         Hint = C.GLFW_SAMPLES          // Specifies the desired number of samples to use for multisampling. Zero disables multisampling.
 	SRGBCapable     Hint = C.GLFW_SRGB_CAPABLE     // Specifies whether the framebuffer should be sRGB capable.
-	RefreshRate     Hint = C.GLFW_REFRESH_RATE     // specifies the desired refresh rate for full screen windows. If set to zero, the highest available refresh rate will be used. This hint is ignored for windowed mode windows.
+	RefreshRate     Hint = C.GLFW_REFRESH_RATE     // Specifies the desired refresh rate for full screen windows. If set to zero, the highest available refresh rate will be used. This hint is ignored for windowed mode windows.
+	DoubleBuffer    Hint = C.GLFW_DOUBLEBUFFER     // Specifies whether the framebuffer should be double buffered. You nearly always want to use double buffering. This is a hard constraint.
 )
 
-// Values for the ClientApi hint.
+// Values for the ClientAPI hint.
 const (
 	OpenGLAPI   int = C.GLFW_OPENGL_API
 	OpenGLESAPI int = C.GLFW_OPENGL_ES_API
@@ -103,17 +105,25 @@ const (
 	LoseContextOnReset  int = C.GLFW_LOSE_CONTEXT_ON_RESET
 )
 
-// Values for the OpenglProfile hint.
+// Values for ContextReleaseBehavior hint.
+const (
+	AnyReleaseBehavior   int = C.GLFW_ANY_RELEASE_BEHAVIOR
+	ReleaseBehaviorFlush int = C.GLFW_RELEASE_BEHAVIOR_FLUSH
+	ReleaseBehaviorNone  int = C.GLFW_RELEASE_BEHAVIOR_NONE
+)
+
+// Values for the OpenGLProfile hint.
 const (
 	OpenGLAnyProfile    int = C.GLFW_OPENGL_ANY_PROFILE
 	OpenGLCoreProfile   int = C.GLFW_OPENGL_CORE_PROFILE
 	OpenGLCompatProfile int = C.GLFW_OPENGL_COMPAT_PROFILE
 )
 
-// TRUE and FALSE values to use with hints.
+// Other values.
 const (
-	True  int = C.GL_TRUE
-	False int = C.GL_FALSE
+	True     int = C.GL_TRUE
+	False    int = C.GL_FALSE
+	DontCare int = C.GLFW_DONT_CARE
 )
 
 type Window struct {
@@ -186,9 +196,9 @@ func goWindowIconifyCB(window unsafe.Pointer, iconified C.int) {
 // DefaultHints resets all window hints to their default values.
 //
 // This function may only be called from the main thread.
-func DefaultWindowHints() error {
+func DefaultWindowHints() {
 	C.glfwDefaultWindowHints()
-	return fetchError()
+	panicError()
 }
 
 // Hint function sets hints for the next call to CreateWindow. The hints,
@@ -196,9 +206,9 @@ func DefaultWindowHints() error {
 // DefaultHints, or until the library is terminated with Terminate.
 //
 // This function may only be called from the main thread.
-func WindowHint(target Hint, hint int) error {
+func WindowHint(target Hint, hint int) {
 	C.glfwWindowHint(C.int(target), C.int(hint))
-	return fetchError()
+	panicError()
 }
 
 // CreateWindow creates a window and its associated context. Most of the options
@@ -251,7 +261,7 @@ func CreateWindow(width, height int, title string, monitor *Monitor, share *Wind
 
 	w := C.glfwCreateWindow(C.int(width), C.int(height), t, m, s)
 	if w == nil {
-		return nil, fetchError()
+		return nil, acceptError(APIUnavailable, VersionUnavailable)
 	}
 
 	wnd := &Window{data: w}
@@ -263,48 +273,51 @@ func CreateWindow(width, height int, title string, monitor *Monitor, share *Wind
 // function, no further callbacks will be called for that window.
 //
 // This function may only be called from the main thread.
-func (w *Window) Destroy() error {
+func (w *Window) Destroy() {
 	windows.remove(w.data)
 	C.glfwDestroyWindow(w.data)
-	return fetchError()
+	panicError()
 }
 
 // ShouldClose returns the value of the close flag of the specified window.
-func (w *Window) ShouldClose() (bool, error) {
-	return glfwbool(C.glfwWindowShouldClose(w.data)), fetchError()
+func (w *Window) ShouldClose() bool {
+	ret := glfwbool(C.glfwWindowShouldClose(w.data))
+	panicError()
+	return ret
 }
 
 // SetShouldClose sets the value of the close flag of the window. This can be
 // used to override the user's attempt to close the window, or to signal that it
 // should be closed.
-func (w *Window) SetShouldClose(value bool) error {
+func (w *Window) SetShouldClose(value bool) {
 	if !value {
 		C.glfwSetWindowShouldClose(w.data, C.GL_FALSE)
 	} else {
 		C.glfwSetWindowShouldClose(w.data, C.GL_TRUE)
 	}
-	return fetchError()
+	panicError()
 }
 
 // SetTitle sets the window title, encoded as UTF-8, of the window.
 //
 // This function may only be called from the main thread.
-func (w *Window) SetTitle(title string) error {
+func (w *Window) SetTitle(title string) {
 	t := C.CString(title)
 	defer C.free(unsafe.Pointer(t))
 	C.glfwSetWindowTitle(w.data, t)
-	return fetchError()
+	panicError()
 }
 
-// GetPosition returns the position, in screen coordinates, of the upper-left
+// GetPos returns the position, in screen coordinates, of the upper-left
 // corner of the client area of the window.
-func (w *Window) GetPosition() (x, y int, err error) {
+func (w *Window) GetPos() (x, y int) {
 	var xpos, ypos C.int
 	C.glfwGetWindowPos(w.data, &xpos, &ypos)
-	return int(xpos), int(ypos), fetchError()
+	panicError()
+	return int(xpos), int(ypos)
 }
 
-// SetPosition sets the position, in screen coordinates, of the upper-left corner
+// SetPos sets the position, in screen coordinates, of the upper-left corner
 // of the client area of the window.
 //
 // If it is a full screen window, this function does nothing.
@@ -318,17 +331,18 @@ func (w *Window) GetPosition() (x, y int, err error) {
 // The window manager may put limits on what positions are allowed.
 //
 // This function may only be called from the main thread.
-func (w *Window) SetPosition(xpos, ypos int) error {
+func (w *Window) SetPos(xpos, ypos int) {
 	C.glfwSetWindowPos(w.data, C.int(xpos), C.int(ypos))
-	return fetchError()
+	panicError()
 }
 
 // GetSize returns the size, in screen coordinates, of the client area of the
 // specified window.
-func (w *Window) GetSize() (width, height int, err error) {
+func (w *Window) GetSize() (width, height int) {
 	var wi, h C.int
 	C.glfwGetWindowSize(w.data, &wi, &h)
-	return int(wi), int(h), fetchError()
+	panicError()
+	return int(wi), int(h)
 }
 
 // SetSize sets the size, in screen coordinates, of the client area of the
@@ -341,17 +355,31 @@ func (w *Window) GetSize() (width, height int, err error) {
 // The window manager may put limits on what window sizes are allowed.
 //
 // This function may only be called from the main thread.
-func (w *Window) SetSize(width, height int) error {
+func (w *Window) SetSize(width, height int) {
 	C.glfwSetWindowSize(w.data, C.int(width), C.int(height))
-	return fetchError()
+	panicError()
 }
 
 // GetFramebufferSize retrieves the size, in pixels, of the framebuffer of the
 // specified window.
-func (w *Window) GetFramebufferSize() (width, height int, err error) {
+func (w *Window) GetFramebufferSize() (width, height int) {
 	var wi, h C.int
 	C.glfwGetFramebufferSize(w.data, &wi, &h)
-	return int(wi), int(h), fetchError()
+	panicError()
+	return int(wi), int(h)
+}
+
+// GetFrameSize retrieves the size, in screen coordinates, of each edge of the frame
+// of the specified window. This size includes the title bar, if the window has one.
+// The size of the frame may vary depending on the window-related hints used to create it.
+//
+// Because this function retrieves the size of each window frame edge and not the offset
+// along a particular coordinate axis, the retrieved values will always be zero or positive.
+func (w *Window) GetFrameSize() (left, top, right, bottom int) {
+	var l, t, r, b C.int
+	C.glfwGetWindowFrameSize(w.data, &l, &t, &r, &b)
+	panicError()
+	return int(l), int(t), int(r), int(b)
 }
 
 // Iconfiy iconifies/minimizes the window, if it was previously restored. If it
@@ -362,7 +390,7 @@ func (w *Window) GetFramebufferSize() (width, height int, err error) {
 // This function may only be called from the main thread.
 func (w *Window) Iconify() error {
 	C.glfwIconifyWindow(w.data)
-	return fetchError()
+	return acceptError(APIUnavailable)
 }
 
 // Restore restores the window, if it was previously iconified/minimized. If it
@@ -373,62 +401,69 @@ func (w *Window) Iconify() error {
 // This function may only be called from the main thread.
 func (w *Window) Restore() error {
 	C.glfwRestoreWindow(w.data)
-	return fetchError()
+	return acceptError(APIUnavailable)
 }
 
 // Show makes the window visible, if it was previously hidden. If the window is
 // already visible or is in full screen mode, this function does nothing.
 //
 // This function may only be called from the main thread.
-func (w *Window) Show() error {
+func (w *Window) Show() {
 	C.glfwShowWindow(w.data)
-	return fetchError()
+	panicError()
 }
 
 // Hide hides the window, if it was previously visible. If the window is already
 // hidden or is in full screen mode, this function does nothing.
 //
 // This function may only be called from the main thread.
-func (w *Window) Hide() error {
+func (w *Window) Hide() {
 	C.glfwHideWindow(w.data)
-	return fetchError()
+	panicError()
 }
 
 // GetMonitor returns the handle of the monitor that the window is in
 // fullscreen on.
-func (w *Window) GetMonitor() (*Monitor, error) {
+//
+// Returns nil if the window is in windowed mode.
+func (w *Window) GetMonitor() *Monitor {
 	m := C.glfwGetWindowMonitor(w.data)
+	panicError()
 	if m == nil {
-		return nil, fetchError()
+		return nil
 	}
-	return &Monitor{m}, nil
+	return &Monitor{m}
 }
 
-// GetAttribute returns an attribute of the window. There are many attributes,
+// GetAttrib returns an attribute of the window. There are many attributes,
 // some related to the window and others to its context.
-func (w *Window) GetAttribute(attrib Hint) (int, error) {
-	return int(C.glfwGetWindowAttrib(w.data, C.int(attrib))), fetchError()
+func (w *Window) GetAttrib(attrib Hint) int {
+	ret := int(C.glfwGetWindowAttrib(w.data, C.int(attrib)))
+	panicError()
+	return ret
 }
 
 // SetUserPointer sets the user-defined pointer of the window. The current value
 // is retained until the window is destroyed. The initial value is nil.
-func (w *Window) SetUserPointer(pointer unsafe.Pointer) error {
+func (w *Window) SetUserPointer(pointer unsafe.Pointer) {
 	C.glfwSetWindowUserPointer(w.data, pointer)
-	return fetchError()
+	panicError()
 }
 
 // GetUserPointer returns the current value of the user-defined pointer of the
 // window. The initial value is nil.
-func (w *Window) GetUserPointer() (unsafe.Pointer, error) {
-	return C.glfwGetWindowUserPointer(w.data), fetchError()
+func (w *Window) GetUserPointer() unsafe.Pointer {
+	ret := C.glfwGetWindowUserPointer(w.data)
+	panicError()
+	return ret
 }
 
-type PositionCallback func(w *Window, xpos int, ypos int)
+type PosCallback func(w *Window, xpos int, ypos int)
 
-// SetPositionCallback sets the position callback of the window, which is called
+// SetPosCallback sets the position callback of the window, which is called
 // when the window is moved. The callback is provided with the screen position
 // of the upper-left corner of the client area of the window.
-func (w *Window) SetPositionCallback(cbfun PositionCallback) (previous PositionCallback, err error) {
+func (w *Window) SetPosCallback(cbfun PosCallback) (previous PosCallback) {
 	previous = w.fPosHolder
 	w.fPosHolder = cbfun
 	if cbfun == nil {
@@ -436,7 +471,8 @@ func (w *Window) SetPositionCallback(cbfun PositionCallback) (previous PositionC
 	} else {
 		C.glfwSetWindowPosCallbackCB(w.data)
 	}
-	return previous, fetchError()
+	panicError()
+	return previous
 }
 
 type SizeCallback func(w *Window, width int, height int)
@@ -444,7 +480,7 @@ type SizeCallback func(w *Window, width int, height int)
 // SetSizeCallback sets the size callback of the window, which is called when
 // the window is resized. The callback is provided with the size, in screen
 // coordinates, of the client area of the window.
-func (w *Window) SetSizeCallback(cbfun SizeCallback) (previous SizeCallback, err error) {
+func (w *Window) SetSizeCallback(cbfun SizeCallback) (previous SizeCallback) {
 	previous = w.fSizeHolder
 	w.fSizeHolder = cbfun
 	if cbfun == nil {
@@ -452,14 +488,15 @@ func (w *Window) SetSizeCallback(cbfun SizeCallback) (previous SizeCallback, err
 	} else {
 		C.glfwSetWindowSizeCallbackCB(w.data)
 	}
-	return previous, fetchError()
+	panicError()
+	return previous
 }
 
 type FramebufferSizeCallback func(w *Window, width int, height int)
 
 // SetFramebufferSizeCallback sets the framebuffer resize callback of the specified
 // window, which is called when the framebuffer of the specified window is resized.
-func (w *Window) SetFramebufferSizeCallback(cbfun FramebufferSizeCallback) (previous FramebufferSizeCallback, err error) {
+func (w *Window) SetFramebufferSizeCallback(cbfun FramebufferSizeCallback) (previous FramebufferSizeCallback) {
 	previous = w.fFramebufferSizeHolder
 	w.fFramebufferSizeHolder = cbfun
 	if cbfun == nil {
@@ -467,7 +504,8 @@ func (w *Window) SetFramebufferSizeCallback(cbfun FramebufferSizeCallback) (prev
 	} else {
 		C.glfwSetFramebufferSizeCallbackCB(w.data)
 	}
-	return previous, fetchError()
+	panicError()
+	return previous
 }
 
 type CloseCallback func(w *Window)
@@ -481,7 +519,7 @@ type CloseCallback func(w *Window)
 //
 // Mac OS X: Selecting Quit from the application menu will trigger the close
 // callback for all windows.
-func (w *Window) SetCloseCallback(cbfun CloseCallback) (previous CloseCallback, err error) {
+func (w *Window) SetCloseCallback(cbfun CloseCallback) (previous CloseCallback) {
 	previous = w.fCloseHolder
 	w.fCloseHolder = cbfun
 	if cbfun == nil {
@@ -489,7 +527,8 @@ func (w *Window) SetCloseCallback(cbfun CloseCallback) (previous CloseCallback, 
 	} else {
 		C.glfwSetWindowCloseCallbackCB(w.data)
 	}
-	return previous, fetchError()
+	panicError()
+	return previous
 }
 
 type RefreshCallback func(w *Window)
@@ -501,7 +540,7 @@ type RefreshCallback func(w *Window)
 // On compositing window systems such as Aero, Compiz or Aqua, where the window
 // contents are saved off-screen, this callback may be called only very
 // infrequently or never at all.
-func (w *Window) SetRefreshCallback(cbfun RefreshCallback) (previous RefreshCallback, err error) {
+func (w *Window) SetRefreshCallback(cbfun RefreshCallback) (previous RefreshCallback) {
 	previous = w.fRefreshHolder
 	w.fRefreshHolder = cbfun
 	if cbfun == nil {
@@ -509,7 +548,8 @@ func (w *Window) SetRefreshCallback(cbfun RefreshCallback) (previous RefreshCall
 	} else {
 		C.glfwSetWindowRefreshCallbackCB(w.data)
 	}
-	return previous, fetchError()
+	panicError()
+	return previous
 }
 
 type FocusCallback func(w *Window, focused bool)
@@ -520,7 +560,7 @@ type FocusCallback func(w *Window, focused bool)
 // After the focus callback is called for a window that lost focus, synthetic key
 // and mouse button release events will be generated for all such that had been
 // pressed. For more information, see SetKeyCallback and SetMouseButtonCallback.
-func (w *Window) SetFocusCallback(cbfun FocusCallback) (previous FocusCallback, err error) {
+func (w *Window) SetFocusCallback(cbfun FocusCallback) (previous FocusCallback) {
 	previous = w.fFocusHolder
 	w.fFocusHolder = cbfun
 	if cbfun == nil {
@@ -528,14 +568,15 @@ func (w *Window) SetFocusCallback(cbfun FocusCallback) (previous FocusCallback, 
 	} else {
 		C.glfwSetWindowFocusCallbackCB(w.data)
 	}
-	return previous, fetchError()
+	panicError()
+	return previous
 }
 
 type IconifyCallback func(w *Window, iconified bool)
 
 // SetIconifyCallback sets the iconification callback of the window, which is
 // called when the window is iconified or restored.
-func (w *Window) SetIconifyCallback(cbfun IconifyCallback) (previous IconifyCallback, err error) {
+func (w *Window) SetIconifyCallback(cbfun IconifyCallback) (previous IconifyCallback) {
 	previous = w.fIconifyHolder
 	w.fIconifyHolder = cbfun
 	if cbfun == nil {
@@ -543,18 +584,19 @@ func (w *Window) SetIconifyCallback(cbfun IconifyCallback) (previous IconifyCall
 	} else {
 		C.glfwSetWindowIconifyCallbackCB(w.data)
 	}
-	return previous, fetchError()
+	panicError()
+	return previous
 }
 
 // SetClipboardString sets the system clipboard to the specified UTF-8 encoded
 // string.
 //
 // This function may only be called from the main thread.
-func (w *Window) SetClipboardString(str string) error {
+func (w *Window) SetClipboardString(str string) {
 	cp := C.CString(str)
 	defer C.free(unsafe.Pointer(cp))
 	C.glfwSetClipboardString(w.data, cp)
-	return fetchError()
+	panicError()
 }
 
 // GetClipboardString returns the contents of the system clipboard, if it
@@ -564,7 +606,7 @@ func (w *Window) SetClipboardString(str string) error {
 func (w *Window) GetClipboardString() (string, error) {
 	cs := C.glfwGetClipboardString(w.data)
 	if cs == nil {
-		return "", fetchError()
+		return "", acceptError(FormatUnavailable)
 	}
 	return C.GoString(cs), nil
 }
@@ -578,9 +620,9 @@ func (w *Window) GetClipboardString() (string, error) {
 // This function may not be called from a callback.
 //
 // This function may only be called from the main thread.
-func PollEvents() error {
+func PollEvents() {
 	C.glfwPollEvents()
-	return fetchError()
+	panicError()
 }
 
 // WaitEvents puts the calling thread to sleep until at least one event has been
@@ -596,9 +638,9 @@ func PollEvents() error {
 // This function may not be called from a callback.
 //
 // This function may only be called from the main thread.
-func WaitEvents() error {
+func WaitEvents() {
 	C.glfwWaitEvents()
-	return fetchError()
+	panicError()
 }
 
 // PostEmptyEvent posts an empty event from the current thread to the main
@@ -609,7 +651,7 @@ func WaitEvents() error {
 // your threading library of choice.
 //
 // This function may be called from secondary threads.
-func PostEmptyEvent() error {
+func PostEmptyEvent() {
 	C.glfwPostEmptyEvent()
-	return fetchError()
+	panicError()
 }
